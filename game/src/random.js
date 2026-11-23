@@ -1,12 +1,23 @@
-// A small seeded random number generator (mulberry32): the same seed gives the same game,
-// which is what makes the screenshot scenes repeatable.
-
-export function createRandom(seed) {
-  let a = seed | 0;
-  return function random() {
-    a = (a + 0x6d2b79f5) | 0;
+// Seeded RNG — mulberry32. No Math.random / Date.now in gameplay.
+export function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
     let t = Math.imul(a ^ (a >>> 15), 1 | a);
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
+}
+export function hashString(s) {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return h >>> 0;
+}
+export class RNG {
+  constructor(seed) { this.next = mulberry32(seed); this.seed = seed >>> 0; }
+  float() { return this.next(); }
+  range(a, b) { return a + this.next() * (b - a); }
+  int(a, b) { return Math.floor(this.range(a, b + 1)); }
+  pick(arr) { return arr[Math.floor(this.next() * arr.length)]; }
+  color(palette) { return this.pick(palette); }
 }

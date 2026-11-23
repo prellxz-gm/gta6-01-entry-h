@@ -1,5 +1,1 @@
-[
-  { "name": "1-start.jpg", "query": "?shot=start&seed=1" },
-  { "name": "2-play.jpg", "query": "?shot=play&seed=1" },
-  { "name": "3-end.jpg", "query": "?shot=end&seed=1" }
-]
+{"shots":[{"description":"COVER — busiest 4-star police chase with helicopter, roadblocks ahead, HUD + minimap + wanted stars + mission objective + business income visible.","height":720,"id":"chase","name":"chase","url":"/game/index.html?shot=chase&seed=1","width":1280},{"description":"Title view over Dusk Ember — ember sunset, volcano on the horizon, city skyline.","height":720,"id":"start","name":"start","url":"/game/index.html?shot=start&seed=1","width":1280},{"description":"Driving through Neon Row with mission objective beacon, HUD cash and income visible.","height":720,"id":"play","name":"play","url":"/game/index.html?shot=play&seed=1","width":1280},{"description":"Endgame — all businesses maxed, all districts controlled, safehouse Lv.3, king of Ember Coast.","height":720,"id":"end","name":"end","url":"/game/index.html?shot=end&seed=1","width":1280}]}

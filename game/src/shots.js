@@ -1,79 +1,79 @@
-// The screenshot scenes behind ?shot=start|play|end. Each one plays the real rules forward from a
-// fresh world for a fixed number of steps, steered by a simple autopilot (look ahead each way the
-// paddle could move, keep clear of blocks, chase the lowest coin when that is safe), so the frame
-// is what a short game really looks like and the same seed always gives the same frame.
-import { FIELD, PLAYER, STEP } from './config.js';
-import { EVENT_OVER, KIND_BLOCK } from './world.js';
-import { SCREEN_OVER, SCREEN_PLAY, SCREEN_TITLE } from './render.js';
-
-const START_SECONDS = 5;
-const PLAY_SECONDS = 26;
-const END_LIMIT_SECONDS = 600;
-/**
- * How far ahead, in seconds, the autopilot checks each way it could move: the play scene's pilot
- * looks well ahead and keeps all its lives; the end scene's looks only a moment ahead, so it is
- * caught out once the blocks speed up, as a hurried player is.
- */
-const HORIZON_PLAY = 0.7;
-const HORIZON_END = 0.25;
-const SAMPLE = 1 / 30;
-const DIRECTIONS = [0, -1, 1];
-/** Extra room, each side, it keeps between the paddle and a block. */
-const MARGIN = 10;
-
-/** Seconds until moving in `direction` (-1, 0, 1) runs the paddle into a block; Infinity when it never does. */
-function timeToHit(state, direction, horizon) {
-  const player = state.player;
-  for (let t = SAMPLE; t <= horizon; t += SAMPLE) {
-    const x = Math.min(FIELD.width - player.width, Math.max(0, player.x + direction * PLAYER.speed * t));
-    for (let index = 0; index < state.items.length; index += 1) {
-      const item = state.items[index];
-      if (!item.active || item.kind !== KIND_BLOCK) continue;
-      const y = item.y + item.speed * t;
-      if (y + item.height > player.y && y < player.y + player.height && item.x < x + player.width + MARGIN && item.x + item.width > x - MARGIN) return t;
-    }
+// Shots — deterministic scene presets for ?shot= (start/play/chase/end).
+// Called before first render so screenshots are real renders of game code.
+export function applyShot(game, shot) {
+  const p = game.player;
+  const pol = game.police;
+  const eco = game.economy;
+  const hideStart = () => { const s = document.getElementById('start-screen'); if (s) s.style.display = 'none'; };
+  if (shot === 'start') {
+    p.x = 0; p.z = 40; p.yaw = 0; p.inCar = false;
+    p.mesh.visible = true; p.carMesh.visible = false;
+    p.mesh.position.set(p.x, 0, p.z);
+    game.started = false;
+    game.renderer.setShotCamera(0, 9, 62, 0, 6, -40);
+    game.renderer.setBeacon(-120, -120);
+    return 'start';
   }
-  return Infinity;
-}
-
-/** Of the safe ways to move, the one toward the lowest coin (or the centre); else the one that is hit last. */
-function autopilot(state, horizon) {
-  const player = state.player;
-  let coin = null;
-  for (let index = 0; index < state.items.length; index += 1) {
-    const item = state.items[index];
-    if (item.active && item.kind !== KIND_BLOCK && (coin === null || item.y > coin.y)) coin = item;
+  if (shot === 'play') {
+    hideStart();
+    game.started = true;
+    p.x = 0; p.z = 20; p.yaw = 0; p.cash = 18400;
+    p.enterCar(); p.speed = 18;
+    eco.businesses[0].level = 1; eco.businesses[1].level = 1; eco.businesses[2].level = 0;
+    eco.recompute();
+    game.missions.list[0].done = true; game.missions.list[1].done = true;
+    game.missions.currentIndex = 2;
+    game.renderer.setBeacon(110, -90);
+    game.renderer.follow({ x: p.x, y: 0, z: p.z }, p.yaw, true, 1);
+    return 'play';
   }
-  const target = coin === null ? FIELD.width / 2 : coin.x + coin.width / 2;
-  const centre = player.x + player.width / 2;
-  const wanted = target > centre + 8 ? 1 : target < centre - 8 ? -1 : 0;
-  let best = wanted;
-  let bestTime = timeToHit(state, wanted, horizon);
-  for (let index = 0; index < DIRECTIONS.length && bestTime !== Infinity; index += 1) {
-    const time = timeToHit(state, DIRECTIONS[index], horizon);
-    if (time > bestTime) {
-      bestTime = time;
-      best = DIRECTIONS[index];
-    }
+  if (shot === 'chase') {
+    hideStart();
+    game.started = true;
+    // Open-road framing: player on the x=0 road heading +z, cops right behind.
+    p.x = 0; p.z = 0; p.yaw = 0; p.cash = 42350; p.health = 82;
+    p.enterCar(); p.speed = 30;
+    eco.businesses[0].level = 2; eco.businesses[1].level = 2; eco.businesses[2].level = 1;
+    eco.safehouseLevel = 2; eco.recompute();
+    game.missions.list[0].done = true; game.missions.list[1].done = true;
+    game.missions.list[2].done = true; game.missions.list[3].done = true;
+    game.missions.currentIndex = 4;
+    pol.setWanted(4);
+    pol.heat = 122; // stay 4-star through the screenshot's decay window
+    // Compose the cover frame, then freeze it: cops flanking the player,
+    // helicopter ahead in view, roadblocks on the road ahead.
+    pol.cops.forEach((c, i) => {
+      const lane = i % 2 === 0 ? -4.6 : 4.6;
+      c.x = p.x + lane; c.z = p.z - 3 - Math.floor(i / 2) * 7;
+      c.mesh.position.set(c.x, 0, c.z);
+      c.mesh.rotation.y = 0;
+    });
+    if (pol.heli) { pol.heli.position.set(12, 18, p.z + 45); }
+    if (pol.roadblocks[0]) pol.roadblocks[0].position.set(-4, 0.6, 70);
+    if (pol.roadblocks[1]) pol.roadblocks[1].position.set(5, 0.6, 88);
+    game.frozen = true;
+    game.renderer.setBeacon(120, 110);
+    game.renderer.follow({ x: p.x, y: 0, z: p.z }, p.yaw, true, 1);
+    return 'chase';
   }
-  return best;
-}
-
-/**
- * Set `world` to the named scene (start, play or end; any other name is start) and return the
- * screen to draw over it and the best score to show.
- */
-export function stageShot(name, world) {
-  world.reset();
-  if (name !== 'play' && name !== 'end') {
-    for (let index = 0; index < START_SECONDS / STEP; index += 1) world.step(STEP, 0, true);
-    return { screen: SCREEN_TITLE, best: 0 };
+  if (shot === 'end') {
+    hideStart();
+    game.started = true;
+    // Stand south of Neon Club VOLT facing it (yaw PI faces -z): follow camera
+    // looks north over the player straight at the club pylon + gold beacon.
+    p.x = 96; p.z = -80; p.yaw = Math.PI; p.cash = 128400;
+    p.inCar = false; p.mesh.visible = true; p.carMesh.visible = false;
+    p.mesh.position.set(p.x, 0, p.z);
+    p.mesh.rotation.y = p.yaw;
+    eco.businesses[0].level = 3; eco.businesses[1].level = 3; eco.businesses[2].level = 3;
+    eco.safehouseLevel = 3; eco.recompute();
+    game.missions.list.forEach(m => { m.done = true; });
+    game.missions.currentIndex = 10;
+    game.missions.districts.forEach(d => { d.controlled = true; d.standing = 88; });
+    pol.clearWanted();
+    game.renderer.setBeacon(96, -108);
+    game.renderer.follow({ x: p.x, y: 0, z: p.z }, p.yaw, false, 1);
+    return 'end';
   }
-  const limit = name === 'end' ? END_LIMIT_SECONDS : PLAY_SECONDS;
-  const horizon = name === 'end' ? HORIZON_END : HORIZON_PLAY;
-  for (let index = 0; index < limit / STEP; index += 1) {
-    if (world.step(STEP, autopilot(world.state, horizon), false) & EVENT_OVER) break;
-  }
-  const over = world.state.lives === 0;
-  return { screen: over ? SCREEN_OVER : SCREEN_PLAY, best: world.state.score };
+  return 'play';
 }
